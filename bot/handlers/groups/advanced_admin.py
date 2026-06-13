@@ -23,6 +23,7 @@ class AdminStates(StatesGroup):
     waiting_trigger_action = State()
     waiting_log_chat = State()
     waiting_auto_delete = State()
+    waiting_ad_price = State()
 
 
 router = Router()
@@ -44,6 +45,7 @@ def extended_settings_kb(chat_id: int):
     builder.button(text="📸 Медиа", callback_data=f"toggle_media:{chat_id}")
     builder.button(text="🎨 Стикеры", callback_data=f"toggle_stickers:{chat_id}")
     builder.button(text="🔇 Тихий режим", callback_data=f"toggle_silent:{chat_id}")
+    builder.button(text="💰 Цена рекламы", callback_data=f"set_adprice:{chat_id}")
     builder.button(text="📝 Лог-канал", callback_data=f"set_logchat:{chat_id}")
     builder.button(text="🧹 Авто-очистка", callback_data=f"set_autodel:{chat_id}")
     builder.button(text="🔙 Назад", callback_data="admin_settings")
@@ -335,6 +337,45 @@ async def trigger_del(callback: CallbackQuery):
 
 
 # ─── Pin / Unpin ───────────────────────────────────────────
+
+# ─── Ad price setting ─────────────────────────────────────
+
+@router.callback_query(F.data.startswith("set_adprice:"))
+async def set_adprice_start(callback: CallbackQuery, state: FSMContext):
+    chat_id = int(callback.data.split(":")[1])
+    chat = await get_chat(chat_id)
+    current = chat.ad_price if chat else 0
+    await state.update_data(chat_id=chat_id)
+    await callback.message.edit_text(
+        f"💰 <b>Цена рекламы в чате</b>\n\n"
+        f"Текущая цена: <code>{current:.0f}⭐</code>\n\n"
+        "Введите стоимость размещения одной рекламы в этом чате (в рублях / ⭐):\n"
+        "Например: <code>100</code>, <code>250</code>, <code>500</code>\n"
+        "Отправьте <code>0</code> чтобы отключить приём рекламы в этом чате.",
+        reply_markup=back_kb(f"chat_settings:{chat_id}")
+    )
+    await state.set_state(AdminStates.waiting_ad_price)
+    await callback.answer()
+
+
+@router.message(StateFilter(AdminStates.waiting_ad_price))
+async def set_adprice_value(message: Message, state: FSMContext):
+    data = await state.get_data()
+    chat_id = data["chat_id"]
+    try:
+        price = float(message.text.strip())
+        if price < 0:
+            raise ValueError
+        await update_chat(chat_id, ad_price=price)
+        if price > 0:
+            await message.answer(f"✅ Цена рекламы установлена: {price:.0f}⭐\nПользователи теперь могут покупать рекламу в этом чате.")
+        else:
+            await message.answer("❌ Приём рекламы в этом чате отключён.")
+    except (ValueError, TypeError):
+        await message.answer("❌ Введите корректную цену (число, 0 — отключить).")
+        return
+    await state.clear()
+
 
 # ─── Auto-delete time setting ──────────────────────────────
 

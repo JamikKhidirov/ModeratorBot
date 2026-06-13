@@ -226,6 +226,29 @@ async def add_balance(user_id: int, amount: float) -> None:
         await session.commit()
 
 
+async def deduct_balance(user_id: int, amount: float) -> bool:
+    async with get_session() as session:
+        result = await session.execute(select(User.balance).where(User.id == user_id))
+        current = result.scalar() or 0.0
+        if current < amount:
+            return False
+        await session.execute(
+            update(User).where(User.id == user_id).values(
+                balance=User.balance - amount
+            )
+        )
+        await session.commit()
+        return True
+
+
+async def get_chats_with_prices() -> list[Chat]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(Chat).where(Chat.ad_price > 0).order_by(Chat.ad_price.asc())
+        )
+        return list(result.scalars().all())
+
+
 async def create_advertisement(
     user_id: int,
     chat_id: int,

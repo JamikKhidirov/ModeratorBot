@@ -93,6 +93,7 @@ class Chat(Base):
     anti_raid_days = Column(Integer, default=7)
     log_chat_id = Column(BigInteger, nullable=True)
     silent_mode = Column(Boolean, default=False)
+    ad_price = Column(Float, default=0.0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     settings = relationship("ChatSettings", back_populates="chat", uselist=False, cascade="all, delete-orphan")
