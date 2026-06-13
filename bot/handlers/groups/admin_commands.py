@@ -8,9 +8,9 @@ from sqlalchemy import func, select
 from bot.database.base import get_session
 from bot.database.requests import (
     get_or_create_chat, get_chat, get_chat_settings, update_chat_settings,
-    get_user, update_user_role,
+    get_user, update_user_role, get_user_chat_ids, is_chat_admin_assigned,
 )
-from bot.database.models import User, Chat, Advertisement, AdStatus, UserRole
+from bot.database.models import User, Chat, Advertisement, AdStatus, UserRole, ChatAdmin
 from bot.filters.admin import IsAdminFilter, IsSuperAdminFilter
 from bot.filters.chat_type import IsGroupFilter, IsPrivateFilter
 from bot.keyboards.inline import (
@@ -28,32 +28,61 @@ class SettingsStates(StatesGroup):
 router = Router()
 
 
-@router.message(Command("admin"), IsPrivateFilter(), IsAdminFilter())
+@router.message(Command("admin"), IsPrivateFilter())
 async def cmd_admin(message: Message):
-    await message.answer(ADMIN_PANEL_TEXT, reply_markup=admin_panel_kb())
+    user = await get_user(message.from_user.id)
+    if not user:
+        return await message.answer("❌ Вы не зарегистрированы.")
+    is_full_admin = user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
+    is_ca = await is_chat_admin_assigned(message.from_user.id, 0)
+    if not is_full_admin:
+        chat_ids = await get_user_chat_ids(message.from_user.id)
+        if not chat_ids:
+            return await message.answer("❌ У вас нет прав администратора.")
+        is_ca = True
+    kb = admin_panel_kb(is_chat_admin=(not is_full_admin))
+    await message.answer(ADMIN_PANEL_TEXT, reply_markup=kb)
 
 
 @router.callback_query(F.data == "admin_panel")
 async def admin_panel_cb(callback: CallbackQuery):
-    await callback.message.edit_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_kb())
+    user = await get_user(callback.from_user.id)
+    is_full_admin = user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
+    kb = admin_panel_kb(is_chat_admin=(not is_full_admin))
+    await callback.message.edit_text(ADMIN_PANEL_TEXT, reply_markup=kb)
     await callback.answer()
 
 
 @router.callback_query(F.data == "admin_stats")
 async def admin_stats(callback: CallbackQuery):
+    user = await get_user(callback.from_user.id)
+    is_full_admin = user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
+
     async with get_session() as session:
-        users_count = (await session.execute(select(func.count(User.id)))).scalar()
-        chats_count = (await session.execute(select(func.count(Chat.id)))).scalar()
-        ads_total = (await session.execute(select(func.count(Advertisement.id)))).scalar()
-        ads_pending = (await session.execute(
-            select(func.count(Advertisement.id)).where(Advertisement.status == AdStatus.PENDING)
-        )).scalar()
-        ads_approved = (await session.execute(
-            select(func.count(Advertisement.id)).where(Advertisement.status == AdStatus.APPROVED)
-        )).scalar()
-        ads_rejected = (await session.execute(
-            select(func.count(Advertisement.id)).where(Advertisement.status == AdStatus.REJECTED)
-        )).scalar()
+        if is_full_admin:
+            users_count = (await session.execute(select(func.count(User.id)))).scalar()
+            chats_count = (await session.execute(select(func.count(Chat.id)))).scalar()
+        else:
+            chat_ids = await get_user_chat_ids(callback.from_user.id)
+            if chat_ids:
+                users_count = 0
+                chats_count = len(chat_ids)
+            else:
+                users_count = 0
+                chats_count = 0
+
+        base = select(func.count(Advertisement.id))
+        if not is_full_admin:
+            chat_ids = await get_user_chat_ids(callback.from_user.id)
+            if chat_ids:
+                base = base.where(Advertisement.chat_id.in_(chat_ids))
+            else:
+                base = base.where(False)
+
+        ads_total = (await session.execute(base)).scalar()
+        ads_pending = (await session.execute(base.where(Advertisement.status == AdStatus.PENDING))).scalar()
+        ads_approved = (await session.execute(base.where(Advertisement.status == AdStatus.APPROVED))).scalar()
+        ads_rejected = (await session.execute(base.where(Advertisement.status == AdStatus.REJECTED))).scalar()
 
     text = ADMIN_STATS_TEXT.format(
         users=users_count or 0,
@@ -71,6 +100,8 @@ async def admin_stats(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("toggle_links"))
 async def toggle_links(callback: CallbackQuery):
     chat_id = int(callback.data.split(":")[1])
+    if not await can_manage_chat(callback.from_user.id, chat_id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
     settings = await get_chat_settings(chat_id)
     new_val = not settings.delete_links if settings else True
     await update_chat_settings(chat_id, delete_links=new_val)
@@ -81,6 +112,8 @@ async def toggle_links(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("toggle_badwords"))
 async def toggle_badwords(callback: CallbackQuery):
     chat_id = int(callback.data.split(":")[1])
+    if not await can_manage_chat(callback.from_user.id, chat_id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
     settings = await get_chat_settings(chat_id)
     new_val = not settings.delete_bad_words if settings else True
     await update_chat_settings(chat_id, delete_bad_words=new_val)
@@ -91,6 +124,8 @@ async def toggle_badwords(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("toggle_captcha"))
 async def toggle_captcha(callback: CallbackQuery):
     chat_id = int(callback.data.split(":")[1])
+    if not await can_manage_chat(callback.from_user.id, chat_id):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
     settings = await get_chat_settings(chat_id)
     new_val = not settings.captcha_enabled if settings else True
     await update_chat_settings(chat_id, captcha_enabled=new_val)
@@ -100,9 +135,22 @@ async def toggle_captcha(callback: CallbackQuery):
 
 @router.callback_query(F.data == "admin_settings")
 async def admin_settings_list(callback: CallbackQuery):
-    async with get_session() as session:
-        result = await session.execute(select(Chat).limit(20))
-        chats = list(result.scalars().all())
+    user = await get_user(callback.from_user.id)
+    is_full_admin = user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)
+
+    if is_full_admin:
+        async with get_session() as session:
+            result = await session.execute(select(Chat).limit(20))
+            chats = list(result.scalars().all())
+    else:
+        chat_ids = await get_user_chat_ids(callback.from_user.id)
+        if not chat_ids:
+            await callback.message.edit_text("❌ У вас нет назначенных чатов.", reply_markup=back_kb("admin_panel"))
+            await callback.answer()
+            return
+        async with get_session() as session:
+            result = await session.execute(select(Chat).where(Chat.id.in_(chat_ids)))
+            chats = list(result.scalars().all())
 
     if not chats:
         await callback.message.edit_text("Нет доступных чатов.", reply_markup=back_kb("admin_panel"))
@@ -121,9 +169,19 @@ async def admin_settings_list(callback: CallbackQuery):
     await callback.answer()
 
 
+async def can_manage_chat(user_id: int, chat_id: int) -> bool:
+    user = await get_user(user_id)
+    if user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        return True
+    return await is_chat_admin_assigned(user_id, chat_id)
+
+
 @router.callback_query(F.data.startswith("chat_settings:"))
 async def chat_settings_menu(callback: CallbackQuery):
     chat_id = int(callback.data.split(":")[1])
+    if not await can_manage_chat(callback.from_user.id, chat_id):
+        await callback.answer("❌ Нет доступа к этому чату", show_alert=True)
+        return
     chat = await get_chat(chat_id)
     name = chat.title if chat else f"Чат {chat_id}"
     await callback.message.edit_text(
@@ -193,6 +251,9 @@ async def set_maxwarns_value(message: Message, state: FSMContext):
 
 @router.callback_query(F.data == "admin_users")
 async def admin_users_list(callback: CallbackQuery):
+    user = await get_user(callback.from_user.id)
+    if not user or user.role not in (UserRole.ADMIN, UserRole.SUPERADMIN):
+        return await callback.answer("❌ Нет доступа", show_alert=True)
     async with get_session() as session:
         result = await session.execute(select(User).order_by(User.created_at.desc()).limit(20))
         users = list(result.scalars().all())

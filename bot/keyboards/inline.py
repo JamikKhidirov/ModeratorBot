@@ -4,14 +4,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from bot.database.models import Advertisement, AdStatus
 
 
-def admin_panel_kb() -> InlineKeyboardMarkup:
+def admin_panel_kb(is_chat_admin: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="📊 Статистика", callback_data="admin_stats")
-    builder.button(text="👑 Роли и админы", callback_data="admin_roles")
-    builder.button(text="🚨 Жалобы", callback_data="admin_reports")
-    builder.button(text="📢 Реклама (заявки)", callback_data="admin_ads_list")
-    builder.button(text="👥 Пользователи", callback_data="admin_users")
-    builder.button(text="⚙️ Настройки чатов", callback_data="admin_settings")
+    if is_chat_admin:
+        builder.button(text="📢 Реклама (заявки)", callback_data="admin_ads_list")
+        builder.button(text="⚙️ Настройки чатов", callback_data="admin_settings")
+    else:
+        builder.button(text="👑 Роли и админы", callback_data="admin_roles")
+        builder.button(text="🚨 Жалобы", callback_data="admin_reports")
+        builder.button(text="📢 Реклама (заявки)", callback_data="admin_ads_list")
+        builder.button(text="👥 Пользователи", callback_data="admin_users")
+        builder.button(text="⚙️ Настройки чатов", callback_data="admin_settings")
     builder.adjust(2)
     return builder.as_markup()
 

@@ -2,7 +2,9 @@ from aiogram import Router, F
 from aiogram.types import Message, ChatMemberUpdated
 from aiogram.filters import ChatMemberUpdatedFilter, JOIN_TRANSITION
 
-from bot.database.requests import get_or_create_chat, get_chat_settings
+from bot.database.requests import (
+    get_or_create_chat, get_chat_settings, add_chat_admin, get_or_create_user,
+)
 from bot.utils.texts import WELCOME_MESSAGE
 
 router = Router()
@@ -17,6 +19,10 @@ async def bot_added_to_group(event: ChatMemberUpdated):
         chat_type=chat.type,
         username=chat.username,
     )
+    adder = event.from_user
+    if adder and not adder.is_bot:
+        await get_or_create_user(adder.id, adder.username, adder.first_name, adder.last_name)
+        await add_chat_admin(user_id=adder.id, chat_id=chat.id, added_by=adder.id)
     await event.bot.send_message(
         chat.id,
         f"👋 Привет! Я бот-модератор.\nИспользуйте /admin для настройки."

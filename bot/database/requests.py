@@ -7,7 +7,7 @@ from bot.database.base import get_session
 from bot.database.models import (
     User, Chat, ChatSettings, Warning, Punishment,
     Advertisement, GroupModerator, Report, WordTrigger, MessageCount,
-    ScheduledMessage, RecurringPost, RssFeed, Payment, AutoDeleteMessage,
+    ScheduledMessage, RecurringPost, RssFeed, Payment, AutoDeleteMessage, ChatAdmin,
     UserRole, PunishmentType, AdStatus, ReportStatus, TriggerAction, ScheduledStatus,
 )
 
@@ -396,7 +396,75 @@ async def is_chat_admin(user_id: int, chat_id: int) -> bool:
     user = await get_user(user_id)
     if user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN):
         return True
-    return await is_group_moderator(user_id, chat_id)
+    if await is_group_moderator(user_id, chat_id):
+        return True
+    return await is_chat_admin_assigned(user_id, chat_id)
+
+
+async def is_chat_admin_assigned(user_id: int, chat_id: int) -> bool:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin).where(
+                and_(ChatAdmin.user_id == user_id, ChatAdmin.chat_id == chat_id)
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+
+async def add_chat_admin(user_id: int, chat_id: int, added_by: int = 0) -> ChatAdmin:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin).where(
+                and_(ChatAdmin.user_id == user_id, ChatAdmin.chat_id == chat_id)
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            return existing
+        ca = ChatAdmin(user_id=user_id, chat_id=chat_id, added_by=added_by)
+        session.add(ca)
+        await session.commit()
+        await session.refresh(ca)
+        return ca
+
+
+async def remove_chat_admin(user_id: int, chat_id: int) -> bool:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin).where(
+                and_(ChatAdmin.user_id == user_id, ChatAdmin.chat_id == chat_id)
+            )
+        )
+        ca = result.scalar_one_or_none()
+        if ca:
+            await session.delete(ca)
+            await session.commit()
+            return True
+        return False
+
+
+async def get_chat_admins(chat_id: int) -> list[ChatAdmin]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin).where(ChatAdmin.chat_id == chat_id)
+        )
+        return list(result.scalars().all())
+
+
+async def get_user_chat_ids(user_id: int) -> list[int]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin.chat_id).where(ChatAdmin.user_id == user_id)
+        )
+        return [row[0] for row in result.all()]
+
+
+async def get_all_chat_admins() -> list[ChatAdmin]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(ChatAdmin).order_by(ChatAdmin.chat_id)
+        )
+        return list(result.scalars().all())
 
 
 # ─── Reports ─────────────────────────────────────────────────

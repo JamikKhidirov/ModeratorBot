@@ -294,3 +294,13 @@ class AutoDeleteMessage(Base):
     message_id = Column(Integer, nullable=False)
     delete_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ChatAdmin(Base):
+    __tablename__ = "chat_admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, nullable=False)
+    chat_id = Column(BigInteger, nullable=False)
+    added_by = Column(BigInteger, default=0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

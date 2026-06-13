@@ -14,6 +14,7 @@ from bot.handlers.groups.scheduled import router as scheduled_router
 from bot.handlers.groups.recurring import router as recurring_router
 from bot.handlers.groups.rss import router as rss_router
 from bot.handlers.groups.welcome_editor import router as welcome_editor_router
+from bot.handlers.groups.chat_admins import router as chat_admins_router
 from bot.handlers.payments import router as payments_router
 from bot.handlers.advertising.buyer import router as buyer_router
 from bot.handlers.advertising.admin_ads import router as admin_ads_router
@@ -35,6 +36,7 @@ def register_handlers():
     dp.include_router(recurring_router)
     dp.include_router(rss_router)
     dp.include_router(welcome_editor_router)
+    dp.include_router(chat_admins_router)
     dp.include_router(payments_router)
     dp.include_router(buyer_router)
     dp.include_router(admin_ads_router)
