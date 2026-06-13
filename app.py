@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 
 
 async def on_startup():
+    if not config.bot_token or config.bot_token == "YOUR_BOT_TOKEN_HERE":
+        print("╔═══════════════════════════════════════════════╗")
+        print("║  ❌ ОШИБКА: Токен бота не указан!           ║")
+        print("║                                             ║")
+        print("║  Открой файл .env и вставь свой токен:      ║")
+        print("║  BOT_TOKEN=1234567890:ABCdef...              ║")
+        print("║                                             ║")
+        print("║  Получить токен: @BotFather                  ║")
+        print("╚═══════════════════════════════════════════════╝")
+        return
+
     logger.info("Инициализация базы данных...")
     await init_db()
     logger.info("База данных готова")

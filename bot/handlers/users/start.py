@@ -12,6 +12,20 @@ from bot.database.requests import get_user, get_warnings_count, get_user_ads
 router = Router()
 
 
+@router.message(Command("config"))
+async def cmd_config(message: Message):
+    token_masked = config.bot_token[:6] + "..." + config.bot_token[-4:] if len(config.bot_token) > 20 else "❌ НЕ УКАЗАН"
+    await message.answer(
+        f"<b>⚙️ Конфигурация бота</b>\n\n"
+        f"🔑 Токен: <code>{token_masked}</code>\n"
+        f"👑 Админы: <code>{config.admin_ids}</code>\n"
+        f"🗄 БД: <code>{config.database_url}</code>\n"
+        f"⏭ Скип апдейтов: {config.skip_updates}\n\n"
+        f"📄 Файл настроек: <code>.env</code> в папке с ботом\n"
+        f"✏️ Открой его и вставь свой токен от @BotFather"
+    )
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message, db_user):
     await message.answer(
