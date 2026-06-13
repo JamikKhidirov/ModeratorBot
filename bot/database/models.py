@@ -304,3 +304,33 @@ class ChatAdmin(Base):
     chat_id = Column(BigInteger, nullable=False)
     added_by = Column(BigInteger, default=0)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Giveaway(Base):
+    __tablename__ = "giveaways"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chat_id = Column(BigInteger, nullable=False)
+    creator_id = Column(BigInteger, nullable=False)
+    message_id = Column(Integer, nullable=True)
+    title = Column(String(256), nullable=False)
+    prize = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    winners_count = Column(Integer, default=1)
+    require_channels = Column(Text, nullable=True)
+    require_repost = Column(Boolean, default=False)
+    repost_channel_id = Column(BigInteger, nullable=True)
+    repost_message_id = Column(Integer, nullable=True)
+    status = Column(String(32), default="active")
+    ends_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class GiveawayParticipant(Base):
+    __tablename__ = "giveaway_participants"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    giveaway_id = Column(Integer, nullable=False)
+    user_id = Column(BigInteger, nullable=False)
+    repost_verified = Column(Boolean, default=False)
+    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

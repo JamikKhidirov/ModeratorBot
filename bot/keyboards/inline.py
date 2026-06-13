@@ -88,6 +88,12 @@ def register_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def giveaway_join_kb(giveaway_id: int, participants: int = 0) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text=f"🎁 Участвовать ({participants})" if participants else "🎁 Участвовать", callback_data=f"giveaway_join:{giveaway_id}")
+    return builder.as_markup()
+
+
 def back_kb(callback: str = "admin_panel") -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 Назад", callback_data=callback)

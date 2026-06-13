@@ -8,6 +8,7 @@ from bot.database.models import (
     User, Chat, ChatSettings, Warning, Punishment,
     Advertisement, GroupModerator, Report, WordTrigger, MessageCount,
     ScheduledMessage, RecurringPost, RssFeed, Payment, AutoDeleteMessage, ChatAdmin,
+    Giveaway, GiveawayParticipant,
     UserRole, PunishmentType, AdStatus, ReportStatus, TriggerAction, ScheduledStatus,
 )
 
@@ -822,3 +823,122 @@ async def delete_auto_message_record(msg_id: int) -> None:
         if adm:
             await session.delete(adm)
             await session.commit()
+
+
+# ─── Giveaways ─────────────────────────────────────────────
+
+async def create_giveaway(
+    chat_id: int, creator_id: int, title: str, prize: str,
+    ends_at: datetime, winners_count: int = 1, description: str = None,
+    require_channels: str = None, require_repost: bool = False,
+    repost_channel_id: int = None, repost_message_id: int = None,
+) -> Giveaway:
+    async with get_session() as session:
+        g = Giveaway(
+            chat_id=chat_id, creator_id=creator_id,
+            title=title, prize=prize, description=description,
+            winners_count=winners_count, ends_at=ends_at,
+            require_channels=require_channels, require_repost=require_repost,
+            repost_channel_id=repost_channel_id, repost_message_id=repost_message_id,
+        )
+        session.add(g)
+        await session.commit()
+        await session.refresh(g)
+        return g
+
+
+async def update_giveaway_message(giveaway_id: int, message_id: int) -> None:
+    async with get_session() as session:
+        await session.execute(
+            update(Giveaway).where(Giveaway.id == giveaway_id).values(message_id=message_id)
+        )
+        await session.commit()
+
+
+async def get_active_giveaways(chat_id: int = None) -> list[Giveaway]:
+    async with get_session() as session:
+        q = select(Giveaway).where(Giveaway.status == "active")
+        if chat_id:
+            q = q.where(Giveaway.chat_id == chat_id)
+        q = q.order_by(Giveaway.created_at.desc())
+        result = await session.execute(q)
+        return list(result.scalars().all())
+
+
+async def get_expired_giveaways() -> list[Giveaway]:
+    async with get_session() as session:
+        now = datetime.now(timezone.utc)
+        result = await session.execute(
+            select(Giveaway).where(
+                Giveaway.status == "active",
+                Giveaway.ends_at <= now,
+            )
+        )
+        return list(result.scalars().all())
+
+
+async def complete_giveaway(giveaway_id: int) -> None:
+    async with get_session() as session:
+        await session.execute(
+            update(Giveaway).where(Giveaway.id == giveaway_id).values(status="completed")
+        )
+        await session.commit()
+
+
+async def cancel_giveaway(giveaway_id: int) -> None:
+    async with get_session() as session:
+        await session.execute(
+            update(Giveaway).where(Giveaway.id == giveaway_id).values(status="cancelled")
+        )
+        await session.commit()
+
+
+async def add_giveaway_participant(giveaway_id: int, user_id: int) -> bool:
+    async with get_session() as session:
+        result = await session.execute(
+            select(GiveawayParticipant).where(
+                and_(
+                    GiveawayParticipant.giveaway_id == giveaway_id,
+                    GiveawayParticipant.user_id == user_id,
+                )
+            )
+        )
+        if result.scalar_one_or_none():
+            return False
+        gp = GiveawayParticipant(giveaway_id=giveaway_id, user_id=user_id)
+        session.add(gp)
+        await session.commit()
+        return True
+
+
+async def get_giveaway_participants(giveaway_id: int) -> list[GiveawayParticipant]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(GiveawayParticipant).where(
+                GiveawayParticipant.giveaway_id == giveaway_id
+            )
+        )
+        return list(result.scalars().all())
+
+
+async def get_giveaway(giveaway_id: int) -> Optional[Giveaway]:
+    async with get_session() as session:
+        result = await session.execute(
+            select(Giveaway).where(Giveaway.id == giveaway_id)
+        )
+        return result.scalar_one_or_none()
+
+
+async def set_participant_repost_verified(giveaway_id: int, user_id: int) -> None:
+    async with get_session() as session:
+        await session.execute(
+            update(GiveawayParticipant)
+            .where(
+                and_(
+                    GiveawayParticipant.giveaway_id == giveaway_id,
+                    GiveawayParticipant.user_id == user_id,
+                )
+            )
+            .values(repost_verified=True)
+        )
+        await session.commit()

@@ -153,6 +153,24 @@ ADMIN_REMOVED = "❌ <b>Администратор удалён</b>\n\n👤 {nam
 MOD_ADDED = "✅ <b>Модератор добавлен!</b>\n\n👤 {name}\n💬 Чат: <code>{chat_id}</code>"
 MOD_REMOVED = "❌ Модератор удалён.\n👤 ID: <code>{user_id}</code>\n💬 Чат: <code>{chat_id}</code>"
 
+# ─── Giveaway ───────────────────────────────────────────────
+
+GIVEAWAY_CREATED_TEXT = """
+🎁 <b>Розыгрыш: {title}</b>
+
+🎁 Приз: {prize}
+{desc}
+
+👥 Победителей: {winners}
+🔒 Подписка: {channels}
+🔄 Репост: {repost}
+⏰ Завершится: {ends}
+
+Нажмите «Участвовать», чтобы присоединиться!
+"""
+
+GIVEAWAY_JOINED_TEXT = "✅ Вы участвуете в розыгрыше! Удачи!"
+
 CANT_REMOVE_SELF = "❌ Нельзя снять права самому себе!"
 USER_NOT_FOUND_ERR = "❌ Пользователь не найден."
 ALREADY_ADMIN = "❌ {name} уже является администратором."

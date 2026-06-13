@@ -8,6 +8,7 @@ from bot.database.requests import (
     get_ready_ads, get_pending_scheduled, mark_scheduled_sent,
     get_recurring_posts, get_active_rss_feeds, update_rss_feed,
     get_expired_messages, delete_auto_message_record,
+    get_expired_giveaways, get_giveaway_participants, complete_giveaway,
 )
 from bot.database.models import AdStatus, Punishment, PunishmentType, Chat
 from bot.loader import bot
@@ -201,6 +202,51 @@ async def auto_delete_checker():
         await asyncio.sleep(30)
 
 
+async def giveaway_winner_checker():
+    while True:
+        try:
+            giveaways = await get_expired_giveaways()
+            for g in giveaways:
+                participants = await get_giveaway_participants(g.id)
+                winner_mentions = []
+                if participants:
+                    import random
+                    winners = random.sample(participants, min(g.winners_count, len(participants)))
+                    for w in winners:
+                        try:
+                            await bot.send_message(
+                                w.user_id,
+                                f"🎉 <b>Поздравляем! Вы выиграли!</b>\n\n"
+                                f"🎁 Розыгрыш: {g.title}\n"
+                                f"🏆 Приз: {g.prize}\n\n"
+                                f"Свяжитесь с администратором для получения приза.",
+                            )
+                        except Exception:
+                            pass
+                        winner_mentions.append(f"<a href=\"tg://user?id={w.user_id}\">{w.user_id}</a>")
+
+                try:
+                    new_text = (
+                        f"🎁 <b>Розыгрыш завершён</b>\n\n"
+                        f"📌 {g.title}\n"
+                        f"🎁 {g.prize}\n"
+                    )
+                    if winner_mentions:
+                        new_text += f"\n🏆 <b>Победители:</b>\n" + "\n".join(f"• {m}" for m in winner_mentions)
+                        new_text += "\n\nПоздравляем!"
+                    else:
+                        new_text += "\n😔 Нет участников."
+
+                    await bot.edit_message_text(new_text, g.chat_id, g.message_id)
+                except Exception:
+                    pass
+
+                await complete_giveaway(g.id)
+        except Exception as e:
+            logging.error(f"Giveaway winner checker: {e}")
+        await asyncio.sleep(30)
+
+
 async def start_scheduler():
     asyncio.create_task(process_advertisements())
     asyncio.create_task(process_scheduled_messages())
@@ -208,3 +254,4 @@ async def start_scheduler():
     asyncio.create_task(recurring_posts_dispatcher())
     asyncio.create_task(rss_poller())
     asyncio.create_task(auto_delete_checker())
+    asyncio.create_task(giveaway_winner_checker())

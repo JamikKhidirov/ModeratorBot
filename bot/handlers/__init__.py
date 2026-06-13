@@ -11,6 +11,7 @@ from bot.handlers.groups.captcha import router as captcha_router
 from bot.handlers.groups.advanced_admin import router as advanced_admin_router
 from bot.handlers.groups.stats import router as stats_router
 from bot.handlers.groups.scheduled import router as scheduled_router
+from bot.handlers.groups.giveaway import router as giveaway_router, repost_router as giveaway_repost_router
 from bot.handlers.groups.recurring import router as recurring_router
 from bot.handlers.groups.rss import router as rss_router
 from bot.handlers.groups.welcome_editor import router as welcome_editor_router
@@ -37,6 +38,8 @@ def register_handlers():
     dp.include_router(rss_router)
     dp.include_router(welcome_editor_router)
     dp.include_router(chat_admins_router)
+    dp.include_router(giveaway_router)
+    dp.include_router(giveaway_repost_router)
     dp.include_router(payments_router)
     dp.include_router(buyer_router)
     dp.include_router(admin_ads_router)
