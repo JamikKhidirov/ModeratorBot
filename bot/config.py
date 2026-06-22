@@ -21,9 +21,14 @@ def load_config() -> Config:
                     continue
                 key, _, val = line.partition("=")
                 os.environ.setdefault(key.strip(), val.strip())
+    raw = os.getenv("ADMIN_IDS", "[]").strip()
+    if raw.startswith("["):
+        admin_ids = json.loads(raw)
+    else:
+        admin_ids = [int(x.strip()) for x in raw.split(",") if x.strip().isdigit()]
     return Config(
         bot_token=os.getenv("BOT_TOKEN", ""),
-        admin_ids=json.loads(os.getenv("ADMIN_IDS", "[]")),
+        admin_ids=admin_ids,
         database_url=os.getenv("DATABASE_URL", "sqlite+aiosqlite:///database.sqlite3"),
         skip_updates=os.getenv("SKIP_UPDATES", "True").lower() == "true",
     )

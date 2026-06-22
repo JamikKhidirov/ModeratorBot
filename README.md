@@ -15,7 +15,7 @@ pip install -r requirements.txt
 # 3. Настроить .env
 #    Открой файл .env и вставь токен от @BotFather:
 #    BOT_TOKEN=1234567890:ABCdef...
-#    ADMIN_IDS=[твой_telegram_id]  (узнать: @userinfobot)
+#    ADMIN_IDS=твой_telegram_id    (форматы: 12345 или [12345, 67890])
 
 # 4. Запустить
 python app.py
