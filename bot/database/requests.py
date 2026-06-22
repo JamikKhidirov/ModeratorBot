@@ -4,6 +4,7 @@ from sqlalchemy import select, update, delete, func, and_
 from sqlalchemy.sql import Select
 
 from bot.database.base import get_session
+from bot.loader import config
 from bot.database.models import (
     User, Chat, ChatSettings, Warning, Punishment,
     Advertisement, GroupModerator, Report, WordTrigger, MessageCount,
@@ -23,12 +24,13 @@ async def get_or_create_user(
         result = await session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if not user:
+            role = UserRole.SUPERADMIN if user_id in config.admin_ids else UserRole.USER
             user = User(
                 id=user_id,
                 username=username,
                 first_name=first_name,
                 last_name=last_name,
-                role=UserRole.USER,
+                role=role,
             )
             session.add(user)
             await session.commit()
@@ -41,6 +43,9 @@ async def get_or_create_user(
                 user.first_name = first_name; changed = True
             if last_name and user.last_name != last_name:
                 user.last_name = last_name; changed = True
+            if user_id in config.admin_ids and user.role != UserRole.SUPERADMIN:
+                user.role = UserRole.SUPERADMIN
+                changed = True
             if changed:
                 await session.commit()
         return user
