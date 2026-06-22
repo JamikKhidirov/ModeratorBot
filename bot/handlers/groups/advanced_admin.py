@@ -9,9 +9,9 @@ from bot.database.base import get_session
 from bot.database.requests import (
     get_chat, update_chat, get_chat_settings, update_chat_settings,
     add_word_trigger, remove_word_trigger, get_word_triggers,
-    get_or_create_chat,
+    get_or_create_chat, get_user, is_chat_admin_assigned,
 )
-from bot.database.models import Chat, TriggerAction
+from bot.database.models import Chat, TriggerAction, UserRole
 from bot.filters.admin import IsAdminFilter
 from bot.filters.chat_type import IsGroupFilter, IsPrivateFilter
 from bot.keyboards.inline import back_kb
@@ -343,6 +343,10 @@ async def trigger_del(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("set_adprice:"))
 async def set_adprice_start(callback: CallbackQuery, state: FSMContext):
     chat_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    if not (user and user.role in (UserRole.ADMIN, UserRole.SUPERADMIN)) and not await is_chat_admin_assigned(user_id, chat_id):
+        return await callback.answer("❌ Нет доступа к настройкам этого чата.", show_alert=True)
     chat = await get_chat(chat_id)
     current = chat.ad_price if chat else 0
     await state.update_data(chat_id=chat_id)

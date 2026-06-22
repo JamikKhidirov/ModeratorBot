@@ -71,6 +71,7 @@ def chat_settings_kb(chat_id: int) -> InlineKeyboardMarkup:
     builder.button(text="👋 Приветствие", callback_data=f"set_welcome:{chat_id}")
     builder.button(text="🔗 Ссылки (вкл/выкл)", callback_data=f"toggle_links:{chat_id}")
     builder.button(text="🤬 Мат (вкл/выкл)", callback_data=f"toggle_badwords:{chat_id}")
+    builder.button(text="💰 Цена рекламы", callback_data=f"set_adprice:{chat_id}")
     builder.button(text="🔒 Капча", callback_data=f"toggle_captcha:{chat_id}")
     builder.button(text="⚠️ Макс. варнов", callback_data=f"set_maxwarns:{chat_id}")
     builder.button(text="🔙 Назад", callback_data="admin_panel")
